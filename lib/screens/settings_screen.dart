@@ -3,8 +3,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter/foundation.dart';
-// Add a placeholder for QR scanning (you can use qr_code_scanner or similar)
-// import 'package:qr_code_scanner/qr_code_scanner.dart';
+import 'package:qr_code_scanner/qr_code_scanner.dart';
 
 class SettingsScreen extends StatefulWidget {
   @override
@@ -72,28 +71,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _scanQrAndSetService() async {
-    // TODO: Implement QR scanning using a package like qr_code_scanner
-    // For now, simulate scanning with a dialog
-    final result = await showDialog<String>(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text('Simulate QR Scan'),
-            content: TextField(
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: 'Paste service URI (e.g. http://192.168.1.2:8000)',
+    if (!(defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS)) {
+      // Fallback to dialog for non-mobile
+      final result = await showDialog<String>(
+        context: context,
+        builder:
+            (context) => AlertDialog(
+              title: Text('Simulate QR Scan'),
+              content: TextField(
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Paste service URI (e.g. http://192.168.1.2:8000)',
+                ),
+                onSubmitted: (value) => Navigator.of(context).pop(value),
               ),
-              onSubmitted: (value) => Navigator.of(context).pop(value),
+              actions: [
+                TextButton(
+                  child: Text('Cancel'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
             ),
-            actions: [
-              TextButton(
-                child: Text('Cancel'),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
-    );
+      );
+      if (result != null && result.startsWith('http')) {
+        final uri = Uri.tryParse(result);
+        setState(() {
+          _scannedServiceUri = result;
+          _scannedPort = uri?.port;
+          _scannedIp = uri?.host;
+        });
+      }
+      return;
+    }
+    // On mobile, use QR scanner
+    final result = await Navigator.of(
+      context,
+    ).push<String>(MaterialPageRoute(builder: (context) => QrScanScreen()));
     if (result != null && result.startsWith('http')) {
       final uri = Uri.tryParse(result);
       setState(() {
@@ -358,5 +372,83 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
       ],
     );
+  }
+}
+
+class QrScanScreen extends StatefulWidget {
+  @override
+  State<QrScanScreen> createState() => _QrScanScreenState();
+}
+
+class _QrScanScreenState extends State<QrScanScreen> {
+  final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
+  QRViewController? controller;
+  bool scanned = false;
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    if (Platform.isAndroid) {
+      controller?.pauseCamera();
+    }
+    controller?.resumeCamera();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Scan QR Code'),
+        backgroundColor: Colors.deepPurple,
+      ),
+      body: Stack(
+        children: [
+          QRView(
+            key: qrKey,
+            onQRViewCreated: _onQRViewCreated,
+            overlay: QrScannerOverlayShape(
+              borderColor: Colors.deepPurple,
+              borderRadius: 10,
+              borderLength: 30,
+              borderWidth: 10,
+              cutOutSize: 250,
+            ),
+          ),
+          Positioned(
+            bottom: 32,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: ElevatedButton.icon(
+                icon: Icon(Icons.close),
+                label: Text('Cancel'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _onQRViewCreated(QRViewController controller) {
+    this.controller = controller;
+    controller.scannedDataStream.listen((scanData) {
+      if (!scanned) {
+        scanned = true;
+        controller.pauseCamera();
+        Navigator.of(context).pop(scanData.code);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    controller?.dispose();
+    super.dispose();
   }
 }

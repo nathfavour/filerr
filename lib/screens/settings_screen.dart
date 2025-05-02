@@ -3,7 +3,8 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter/foundation.dart';
-import 'package:qr_code_scanner/qr_code_scanner.dart';
+// import 'package:qr_code_scanner/qr_code_scanner.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 class SettingsScreen extends StatefulWidget {
   @override
@@ -381,17 +382,25 @@ class QrScanScreen extends StatefulWidget {
 }
 
 class _QrScanScreenState extends State<QrScanScreen> {
-  final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
-  QRViewController? controller;
+  // final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
+  // QRViewController? controller;
+
   bool scanned = false;
+  MobileScannerController controller = MobileScannerController();
+
+  // @override
+  // void reassemble() {
+  //   super.reassemble();
+  //   if (Platform.isAndroid) {
+  //     controller?.pauseCamera();
+  //   }
+  //   controller?.resumeCamera();
+  // }
 
   @override
-  void reassemble() {
-    super.reassemble();
-    if (Platform.isAndroid) {
-      controller?.pauseCamera();
-    }
-    controller?.resumeCamera();
+  void dispose() {
+    controller?.dispose();
+    super.dispose();
   }
 
   @override
@@ -403,17 +412,35 @@ class _QrScanScreenState extends State<QrScanScreen> {
       ),
       body: Stack(
         children: [
-          QRView(
-            key: qrKey,
-            onQRViewCreated: _onQRViewCreated,
-            overlay: QrScannerOverlayShape(
-              borderColor: Colors.deepPurple,
-              borderRadius: 10,
-              borderLength: 30,
-              borderWidth: 10,
-              cutOutSize: 250,
+          Center(
+            child: SizedBox(
+              width: 320,
+              height: 400,
+              child: MobileScanner(
+                controller: controller,
+                allowDuplicates: false,
+                onDetect: (barcode, args) {
+                  if (!scanned && barcode.rawValue != null) {
+                    scanned = true;
+                    controller.stop();
+                    Navigator.of(context).pop(barcode.rawValue);
+                  }
+                },
+              ),
             ),
           ),
+
+          // QRView(
+          //   key: qrKey,
+          //   onQRViewCreated: _onQRViewCreated,
+          //   overlay: QrScannerOverlayShape(
+          //     borderColor: Colors.deepPurple,
+          //     borderRadius: 10,
+          //     borderLength: 30,
+          //     borderWidth: 10,
+          //     cutOutSize: 250,
+          //   ),
+          // )
           Positioned(
             bottom: 32,
             left: 0,

@@ -489,12 +489,27 @@ class QrScanScreen extends StatefulWidget {
 }
 
 class _QrScanScreenState extends State<QrScanScreen> {
-  final MobileScannerController controller = MobileScannerController(
-    // Optional: Configure camera settings if needed
-    // facing: CameraFacing.back,
-    // torchEnabled: false,
-  );
+  final MobileScannerController controller = MobileScannerController();
   bool _scanned = false; // Prevent multiple pops
+  bool _torchOn = false;
+  CameraFacing _cameraFacing = CameraFacing.back;
+
+  void _toggleTorch() async {
+    await controller.toggleTorch();
+    setState(() {
+      _torchOn = !_torchOn;
+    });
+  }
+
+  void _switchCamera() async {
+    await controller.switchCamera();
+    setState(() {
+      _cameraFacing =
+          _cameraFacing == CameraFacing.back
+              ? CameraFacing.front
+              : CameraFacing.back;
+    });
+  }
 
   @override
   void dispose() {
@@ -511,35 +526,22 @@ class _QrScanScreenState extends State<QrScanScreen> {
         actions: [
           IconButton(
             color: Colors.white,
-            icon: ValueListenableBuilder(
-              valueListenable: controller.torchState,
-              builder: (context, state, child) {
-                switch (state) {
-                  case TorchState.off:
-                    return const Icon(Icons.flash_off, color: Colors.grey);
-                  case TorchState.on:
-                    return const Icon(Icons.flash_on, color: Colors.yellow);
-                }
-              },
+            icon: Icon(
+              _torchOn ? Icons.flash_on : Icons.flash_off,
+              color: _torchOn ? Colors.yellow : Colors.grey,
             ),
             iconSize: 32.0,
-            onPressed: () => controller.toggleTorch(),
+            onPressed: _toggleTorch,
           ),
           IconButton(
             color: Colors.white,
-            icon: ValueListenableBuilder(
-              valueListenable: controller.cameraFacingState,
-              builder: (context, state, child) {
-                switch (state) {
-                  case CameraFacing.front:
-                    return const Icon(Icons.camera_front);
-                  case CameraFacing.back:
-                    return const Icon(Icons.camera_rear);
-                }
-              },
+            icon: Icon(
+              _cameraFacing == CameraFacing.front
+                  ? Icons.camera_front
+                  : Icons.camera_rear,
             ),
             iconSize: 32.0,
-            onPressed: () => controller.switchCamera(),
+            onPressed: _switchCamera,
           ),
         ],
       ),
@@ -547,11 +549,9 @@ class _QrScanScreenState extends State<QrScanScreen> {
         children: [
           MobileScanner(
             controller: controller,
-            // allowDuplicates: false, // Deprecated, use logic in onDetect
             onDetect: (capture) {
               if (!_scanned) {
                 final List<Barcode> barcodes = capture.barcodes;
-                // final Uint8List? image = capture.image; // If you need the image
                 for (final barcode in barcodes) {
                   if (barcode.rawValue != null) {
                     debugPrint('Barcode found! ${barcode.rawValue}');
